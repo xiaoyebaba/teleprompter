@@ -1,0 +1,18 @@
+{
+  "name": "视频脚本题词器",
+  "short_name": "题词器",
+  "description": "用于手机和桌面拍摄的视频脚本题词器。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12161a",
+  "theme_color": "#12161a",
+  "icons": [
+    {
+      "src": "../icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

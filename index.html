@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#12161a" />
+    <title>视频脚本题词器</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage" aria-label="题词器播放区">
+        <header class="stage-header">
+          <div class="mark" aria-hidden="true">
+            <span></span>
+            <span></span>
+          </div>
+          <div class="title-stack">
+            <p>Prompter</p>
+            <h1>视频脚本题词器</h1>
+          </div>
+          <button class="icon-button ghost mobile-panel-toggle" id="mobilePanelToggle" type="button" aria-label="设置" title="设置">
+            <span aria-hidden="true">☰</span>
+          </button>
+        </header>
+
+        <div class="teleprompter" id="teleprompter" tabindex="0">
+          <div class="guide-line" id="guideLine" aria-hidden="true"></div>
+          <article class="script-output" id="scriptOutput"></article>
+        </div>
+
+        <footer class="playbar" aria-label="播放控制">
+          <button class="icon-button primary" id="playPause" type="button" aria-label="开始滚动" title="开始/暂停">
+            <span id="playIcon" aria-hidden="true">▶</span>
+          </button>
+          <button class="icon-button" id="resetScroll" type="button" aria-label="回到开头" title="回到开头">
+            <span aria-hidden="true">↺</span>
+          </button>
+          <button class="icon-button" id="jumpBack" type="button" aria-label="后退" title="后退">
+            <span aria-hidden="true">‹</span>
+          </button>
+          <button class="icon-button" id="jumpForward" type="button" aria-label="前进" title="前进">
+            <span aria-hidden="true">›</span>
+          </button>
+          <button class="icon-button" id="fullscreenToggle" type="button" aria-label="全屏" title="全屏">
+            <span aria-hidden="true">⛶</span>
+          </button>
+          <div class="progress-group" aria-label="滚动进度">
+            <div class="progress-track">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <output id="progressLabel">0%</output>
+          </div>
+        </footer>
+      </section>
+
+      <aside class="control-panel" id="controlPanel" aria-label="脚本与设置">
+        <section class="panel-section editor-section">
+          <div class="section-heading">
+            <h2>脚本</h2>
+            <div class="button-row">
+              <button class="tool-button" id="loadSample" type="button">示例</button>
+              <button class="tool-button" id="clearScript" type="button">清空</button>
+            </div>
+          </div>
+          <textarea id="scriptInput" spellcheck="false" placeholder="脚本正文"></textarea>
+          <div class="editor-actions">
+            <label class="file-button">
+              <input id="fileInput" type="file" accept=".txt,.md,text/plain,text/markdown" />
+              导入
+            </label>
+            <button class="tool-button" id="downloadScript" type="button">导出</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>滚动</h2>
+            <span class="value-pill"><output id="speedValue">48</output> px/s</span>
+          </div>
+          <label class="slider-row">
+            <span>速度</span>
+            <input id="speedInput" type="range" min="12" max="180" step="2" value="48" />
+          </label>
+        </section>
+
+        <section class="settings-grid">
+          <label class="setting-box">
+            <span>字号</span>
+            <output id="fontSizeValue">56</output>
+            <input id="fontSizeInput" type="range" min="28" max="104" step="2" value="56" />
+          </label>
+          <label class="setting-box">
+            <span>行距</span>
+            <output id="lineHeightValue">1.45</output>
+            <input id="lineHeightInput" type="range" min="1.1" max="2" step="0.05" value="1.45" />
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>显示</h2>
+          </div>
+          <div class="segmented" role="group" aria-label="主题">
+            <button class="segment active" data-theme="dark" type="button">黑底</button>
+            <button class="segment" data-theme="paper" type="button">白底</button>
+            <button class="segment" data-theme="studio" type="button">棚拍</button>
+          </div>
+          <div class="switch-list">
+            <label class="switch-row">
+              <span>镜像</span>
+              <input id="mirrorToggle" type="checkbox" />
+            </label>
+            <label class="switch-row">
+              <span>焦点线</span>
+              <input id="guideToggle" type="checkbox" checked />
+            </label>
+            <label class="switch-row">
+              <span>防息屏</span>
+              <input id="wakeToggle" type="checkbox" />
+            </label>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
