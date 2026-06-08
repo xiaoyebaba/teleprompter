@@ -62,6 +62,8 @@ let isPlaying = false;
 let frameId = null;
 let lastFrameTime = 0;
 let wakeLock = null;
+let lastTapTime = 0;
+let lastTapTarget = null;
 
 hydrateControls();
 renderScript();
@@ -84,6 +86,8 @@ function bindEvents() {
   elements.jumpForward.addEventListener("click", () => jumpBy(160));
   elements.fullscreenToggle.addEventListener("click", toggleFullscreen);
   elements.teleprompter.addEventListener("scroll", updateProgress, { passive: true });
+  elements.scriptOutput.addEventListener("dblclick", handleScriptJump);
+  elements.scriptOutput.addEventListener("pointerup", handleScriptTap);
   elements.mobilePanelToggle.addEventListener("click", (event) => {
     event.stopPropagation();
     elements.controlPanel.classList.toggle("open");
@@ -128,6 +132,49 @@ function bindEvents() {
   document.addEventListener("keydown", handleKeydown);
   document.addEventListener("fullscreenchange", () => elements.controlPanel.classList.remove("open"));
   document.addEventListener("visibilitychange", handleVisibilityChange);
+}
+
+function handleScriptTap(event) {
+  const paragraph = event.target.closest("#scriptOutput p");
+  if (!paragraph) return;
+
+  const now = Date.now();
+  const isDoubleTap = paragraph === lastTapTarget && now - lastTapTime < 340;
+  lastTapTime = now;
+  lastTapTarget = paragraph;
+
+  if (isDoubleTap) {
+    event.preventDefault();
+    startFromParagraph(paragraph);
+    lastTapTime = 0;
+    lastTapTarget = null;
+  }
+}
+
+function handleScriptJump(event) {
+  const paragraph = event.target.closest("#scriptOutput p");
+  if (!paragraph) return;
+  event.preventDefault();
+  startFromParagraph(paragraph);
+}
+
+function startFromParagraph(paragraph) {
+  if (paragraph.classList.contains("empty-line")) return;
+
+  pausePlayback();
+  const containerRect = elements.teleprompter.getBoundingClientRect();
+  const paragraphRect = paragraph.getBoundingClientRect();
+  const paragraphTop = elements.teleprompter.scrollTop + paragraphRect.top - containerRect.top;
+  elements.teleprompter.scrollTop = Math.max(0, paragraphTop - elements.teleprompter.clientHeight * 0.42);
+  updateProgress();
+  flashParagraph(paragraph);
+  startPlayback();
+}
+
+function flashParagraph(paragraph) {
+  paragraph.classList.remove("jump-target");
+  void paragraph.offsetWidth;
+  paragraph.classList.add("jump-target");
 }
 
 function hydrateControls() {
