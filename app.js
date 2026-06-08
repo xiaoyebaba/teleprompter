@@ -63,7 +63,8 @@ let frameId = null;
 let lastFrameTime = 0;
 let wakeLock = null;
 let lastTapTime = 0;
-let lastTapTarget = null;
+let lastTapY = 0;
+let suppressDblClickUntil = 0;
 
 hydrateControls();
 renderScript();
@@ -135,19 +136,22 @@ function bindEvents() {
 }
 
 function handleScriptTap(event) {
+  if (event.pointerType === "mouse") return;
+
   const paragraph = event.target.closest("#scriptOutput p");
   if (!paragraph) return;
 
   const now = Date.now();
-  const isDoubleTap = paragraph === lastTapTarget && now - lastTapTime < 340;
+  const isDoubleTap = now - lastTapTime < 340 && Math.abs(event.clientY - lastTapY) < 48;
   lastTapTime = now;
-  lastTapTarget = paragraph;
+  lastTapY = event.clientY;
 
   if (isDoubleTap) {
     event.preventDefault();
-    startFromParagraph(paragraph);
+    startFromPoint(event.clientY, paragraph);
+    suppressDblClickUntil = Date.now() + 420;
     lastTapTime = 0;
-    lastTapTarget = null;
+    lastTapY = 0;
   }
 }
 
@@ -155,23 +159,24 @@ function handleScriptJump(event) {
   const paragraph = event.target.closest("#scriptOutput p");
   if (!paragraph) return;
   event.preventDefault();
-  startFromParagraph(paragraph);
+  if (Date.now() < suppressDblClickUntil) return;
+  startFromPoint(event.clientY, paragraph);
 }
 
-function startFromParagraph(paragraph) {
+function startFromPoint(clientY, paragraph) {
   if (paragraph.classList.contains("empty-line")) return;
 
   pausePlayback();
   const containerRect = elements.teleprompter.getBoundingClientRect();
-  const paragraphRect = paragraph.getBoundingClientRect();
-  const paragraphTop = elements.teleprompter.scrollTop + paragraphRect.top - containerRect.top;
-  elements.teleprompter.scrollTop = Math.max(0, paragraphTop - elements.teleprompter.clientHeight * 0.42);
+  const clickedContentY = elements.teleprompter.scrollTop + clientY - containerRect.top;
+  const guideY = elements.teleprompter.clientHeight * 0.46;
+  elements.teleprompter.scrollTop = Math.max(0, clickedContentY - guideY);
   updateProgress();
-  flashParagraph(paragraph);
+  flashTarget(paragraph);
   startPlayback();
 }
 
-function flashParagraph(paragraph) {
+function flashTarget(paragraph) {
   paragraph.classList.remove("jump-target");
   void paragraph.offsetWidth;
   paragraph.classList.add("jump-target");

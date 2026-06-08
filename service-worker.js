@@ -1,4 +1,4 @@
-const cacheName = "video-prompter-v2";
+const cacheName = "video-prompter-v4";
 const assets = [
   "./",
   "./index.html",

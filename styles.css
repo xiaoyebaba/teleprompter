@@ -529,6 +529,10 @@ input[type="range"] {
     box-shadow: -18px 0 46px rgba(0, 0, 0, 0.26);
   }
 
+  .control-panel.open {
+    transform: translateX(0);
+  }
+
   .script-output {
     padding-inline: clamp(18px, 6vw, 54px);
   }
