@@ -27,6 +27,7 @@
 
         <div class="teleprompter" id="teleprompter" tabindex="0">
           <div class="guide-line" id="guideLine" aria-hidden="true"></div>
+          <div class="countdown-overlay" id="countdownOverlay" aria-live="polite" hidden></div>
           <article class="script-output" id="scriptOutput"></article>
         </div>
 
@@ -47,10 +48,24 @@
             <span aria-hidden="true">⛶</span>
           </button>
           <div class="progress-group" aria-label="滚动进度">
-            <div class="progress-track">
+            <div class="progress-topline">
+              <output id="activeParagraphLabel">第 0 / 0 段</output>
+              <output id="progressLabel">0%</output>
+              <output id="remainingLabel">剩余 00:00</output>
+            </div>
+            <input
+              class="progress-scrubber"
+              id="progressInput"
+              type="range"
+              min="0"
+              max="1000"
+              step="1"
+              value="0"
+              aria-label="滚动位置"
+            />
+            <div class="progress-track" aria-hidden="true">
               <div class="progress-fill" id="progressFill"></div>
             </div>
-            <output id="progressLabel">0%</output>
           </div>
         </footer>
       </section>
@@ -83,6 +98,17 @@
             <span>速度</span>
             <input id="speedInput" type="range" min="12" max="180" step="2" value="48" />
           </label>
+          <div class="subsection">
+            <div class="subsection-heading">
+              <span>开场倒计时</span>
+              <output id="countdownValue">0 秒</output>
+            </div>
+            <div class="segmented compact" role="group" aria-label="开场倒计时">
+              <button class="segment active" data-countdown="0" type="button">关</button>
+              <button class="segment" data-countdown="3" type="button">3 秒</button>
+              <button class="segment" data-countdown="5" type="button">5 秒</button>
+            </div>
+          </div>
         </section>
 
         <section class="settings-grid">
@@ -120,6 +146,30 @@
               <span>防息屏</span>
               <input id="wakeToggle" type="checkbox" />
             </label>
+            <label class="switch-row">
+              <span>聚焦模式</span>
+              <input id="focusToggle" type="checkbox" checked />
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>脚本概览</h2>
+          </div>
+          <div class="stats-grid" aria-label="脚本统计">
+            <div class="stat-card">
+              <span>字数</span>
+              <output id="charCountValue">0</output>
+            </div>
+            <div class="stat-card">
+              <span>段落</span>
+              <output id="paragraphCountValue">0</output>
+            </div>
+            <div class="stat-card wide">
+              <span>预计全程</span>
+              <output id="durationValue">00:00</output>
+            </div>
           </div>
         </section>
       </aside>

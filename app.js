@@ -1,4 +1,4 @@
-const storageKey = "video-prompter-v1";
+const storageKey = "video-prompter-v2";
 
 const sampleScript = `大家好，欢迎来到今天的视频。
 
@@ -23,12 +23,13 @@ const defaults = {
   mirror: false,
   guide: true,
   wake: false,
+  focusMode: true,
+  countdown: 0,
 };
 
 const elements = {
-  appShell: document.querySelector(".app-shell"),
-  stage: document.querySelector(".stage"),
   teleprompter: document.querySelector("#teleprompter"),
+  countdownOverlay: document.querySelector("#countdownOverlay"),
   scriptOutput: document.querySelector("#scriptOutput"),
   scriptInput: document.querySelector("#scriptInput"),
   playPause: document.querySelector("#playPause"),
@@ -38,26 +39,37 @@ const elements = {
   jumpForward: document.querySelector("#jumpForward"),
   fullscreenToggle: document.querySelector("#fullscreenToggle"),
   progressFill: document.querySelector("#progressFill"),
+  activeParagraphLabel: document.querySelector("#activeParagraphLabel"),
   progressLabel: document.querySelector("#progressLabel"),
+  remainingLabel: document.querySelector("#remainingLabel"),
+  progressInput: document.querySelector("#progressInput"),
   speedInput: document.querySelector("#speedInput"),
   speedValue: document.querySelector("#speedValue"),
   fontSizeInput: document.querySelector("#fontSizeInput"),
   fontSizeValue: document.querySelector("#fontSizeValue"),
   lineHeightInput: document.querySelector("#lineHeightInput"),
   lineHeightValue: document.querySelector("#lineHeightValue"),
+  countdownValue: document.querySelector("#countdownValue"),
   mirrorToggle: document.querySelector("#mirrorToggle"),
   guideToggle: document.querySelector("#guideToggle"),
   wakeToggle: document.querySelector("#wakeToggle"),
+  focusToggle: document.querySelector("#focusToggle"),
   loadSample: document.querySelector("#loadSample"),
   clearScript: document.querySelector("#clearScript"),
   fileInput: document.querySelector("#fileInput"),
   downloadScript: document.querySelector("#downloadScript"),
   mobilePanelToggle: document.querySelector("#mobilePanelToggle"),
   controlPanel: document.querySelector("#controlPanel"),
+  stage: document.querySelector(".stage"),
   themeButtons: [...document.querySelectorAll("[data-theme]")],
+  countdownButtons: [...document.querySelectorAll("[data-countdown]")],
+  charCountValue: document.querySelector("#charCountValue"),
+  paragraphCountValue: document.querySelector("#paragraphCountValue"),
+  durationValue: document.querySelector("#durationValue"),
 };
 
 const state = { ...defaults, ...loadState() };
+
 let isPlaying = false;
 let frameId = null;
 let lastFrameTime = 0;
@@ -65,6 +77,10 @@ let wakeLock = null;
 let lastTapTime = 0;
 let lastTapY = 0;
 let suppressDblClickUntil = 0;
+let countdownTimer = null;
+let countdownPending = false;
+let isScrubbing = false;
+let activeParagraphIndex = -1;
 
 hydrateControls();
 renderScript();
@@ -87,12 +103,16 @@ function bindEvents() {
   elements.jumpForward.addEventListener("click", () => jumpBy(160));
   elements.fullscreenToggle.addEventListener("click", toggleFullscreen);
   elements.teleprompter.addEventListener("scroll", updateProgress, { passive: true });
+  elements.progressInput.addEventListener("input", handleProgressInput);
+  elements.progressInput.addEventListener("change", handleProgressCommit);
   elements.scriptOutput.addEventListener("dblclick", handleScriptJump);
   elements.scriptOutput.addEventListener("pointerup", handleScriptTap);
+
   elements.mobilePanelToggle.addEventListener("click", (event) => {
     event.stopPropagation();
     elements.controlPanel.classList.toggle("open");
   });
+
   elements.stage.addEventListener("click", () => elements.controlPanel.classList.remove("open"));
   elements.controlPanel.addEventListener("click", (event) => event.stopPropagation());
 
@@ -102,11 +122,20 @@ function bindEvents() {
 
   elements.mirrorToggle.addEventListener("change", () => updateBooleanSetting("mirror", elements.mirrorToggle.checked));
   elements.guideToggle.addEventListener("change", () => updateBooleanSetting("guide", elements.guideToggle.checked));
+  elements.focusToggle.addEventListener("change", () => updateBooleanSetting("focusMode", elements.focusToggle.checked));
   elements.wakeToggle.addEventListener("change", () => updateWakeSetting(elements.wakeToggle.checked));
 
   elements.themeButtons.forEach((button) => {
     button.addEventListener("click", () => {
       state.theme = button.dataset.theme;
+      applySettings();
+      saveState();
+    });
+  });
+
+  elements.countdownButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.countdown = Number(button.dataset.countdown);
       applySettings();
       saveState();
     });
@@ -130,9 +159,156 @@ function bindEvents() {
 
   elements.fileInput.addEventListener("change", importScript);
   elements.downloadScript.addEventListener("click", downloadScript);
+
   document.addEventListener("keydown", handleKeydown);
   document.addEventListener("fullscreenchange", () => elements.controlPanel.classList.remove("open"));
   document.addEventListener("visibilitychange", handleVisibilityChange);
+}
+
+function hydrateControls() {
+  elements.scriptInput.value = state.script;
+  elements.speedInput.value = state.speed;
+  elements.fontSizeInput.value = state.fontSize;
+  elements.lineHeightInput.value = state.lineHeight;
+  elements.mirrorToggle.checked = state.mirror;
+  elements.guideToggle.checked = state.guide;
+  elements.focusToggle.checked = state.focusMode;
+  elements.wakeToggle.checked = state.wake;
+}
+
+function renderScript() {
+  elements.scriptOutput.replaceChildren();
+  activeParagraphIndex = -1;
+
+  const script = state.script.trim();
+  if (!script) {
+    const empty = document.createElement("p");
+    empty.className = "empty-line";
+    empty.textContent = "脚本为空";
+    elements.scriptOutput.append(empty);
+    updateStats();
+    return;
+  }
+
+  script.split(/\n{2,}/).forEach((block) => {
+    const paragraph = document.createElement("p");
+    block.split(/\n/).forEach((line, index) => {
+      if (index > 0) paragraph.append(document.createElement("br"));
+      paragraph.append(document.createTextNode(line));
+    });
+    elements.scriptOutput.append(paragraph);
+  });
+
+  updateStats();
+}
+
+function applySettings() {
+  elements.teleprompter.style.setProperty("--script-size", `${state.fontSize}px`);
+  elements.teleprompter.style.setProperty("--script-line", state.lineHeight);
+  elements.teleprompter.style.setProperty("--mirror", state.mirror ? -1 : 1);
+  elements.teleprompter.classList.toggle("hide-guide", !state.guide);
+  elements.teleprompter.classList.toggle("focus-mode", state.focusMode);
+
+  document.body.classList.toggle("theme-paper", state.theme === "paper");
+  document.body.classList.toggle("theme-studio", state.theme === "studio");
+
+  elements.themeButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.theme === state.theme);
+  });
+
+  elements.countdownButtons.forEach((button) => {
+    button.classList.toggle("active", Number(button.dataset.countdown) === state.countdown);
+  });
+
+  elements.speedValue.textContent = String(state.speed);
+  elements.fontSizeValue.textContent = String(state.fontSize);
+  elements.lineHeightValue.textContent = Number(state.lineHeight).toFixed(2);
+  elements.countdownValue.textContent = state.countdown === 0 ? "关闭" : `${state.countdown} 秒`;
+}
+
+function updateNumberSetting(key, value) {
+  state[key] = Number(value);
+  applySettings();
+  saveState();
+  updateProgress();
+}
+
+function updateBooleanSetting(key, value) {
+  state[key] = value;
+  applySettings();
+  saveState();
+}
+
+async function updateWakeSetting(enabled) {
+  state.wake = enabled;
+  saveState();
+
+  if (!enabled) {
+    await releaseWakeLock();
+    return;
+  }
+
+  const locked = await requestWakeLock();
+  if (!locked) {
+    state.wake = false;
+    elements.wakeToggle.checked = false;
+    saveState();
+  }
+}
+
+function togglePlayback() {
+  if (isPlaying || countdownPending) {
+    pausePlayback();
+    return;
+  }
+  startPlaybackWithCountdown();
+}
+
+async function startPlaybackWithCountdown(forceImmediate = false) {
+  if (!forceImmediate && state.countdown > 0) {
+    await runCountdown();
+    return;
+  }
+  await startPlayback();
+}
+
+async function startPlayback() {
+  if (isPlaying) return;
+  clearCountdown();
+  isPlaying = true;
+  lastFrameTime = performance.now();
+  elements.playPause.setAttribute("aria-label", "暂停滚动");
+  elements.playIcon.textContent = "Ⅱ";
+  if (state.wake) await requestWakeLock();
+  frameId = requestAnimationFrame(step);
+}
+
+function pausePlayback() {
+  clearCountdown();
+  isPlaying = false;
+  elements.playPause.setAttribute("aria-label", "开始滚动");
+  elements.playIcon.textContent = "▶";
+  if (frameId) {
+    cancelAnimationFrame(frameId);
+    frameId = null;
+  }
+}
+
+function step(now) {
+  if (!isPlaying) return;
+
+  const elapsed = Math.min((now - lastFrameTime) / 1000, 0.08);
+  lastFrameTime = now;
+  elements.teleprompter.scrollTop += state.speed * elapsed;
+
+  if (isAtBottom()) {
+    pausePlayback();
+    updateProgress();
+    return;
+  }
+
+  updateProgress();
+  frameId = requestAnimationFrame(step);
 }
 
 function handleScriptTap(event) {
@@ -173,135 +349,13 @@ function startFromPoint(clientY, paragraph) {
   elements.teleprompter.scrollTop = Math.max(0, clickedContentY - guideY);
   updateProgress();
   flashTarget(paragraph);
-  startPlayback();
+  startPlaybackWithCountdown(true);
 }
 
 function flashTarget(paragraph) {
   paragraph.classList.remove("jump-target");
   void paragraph.offsetWidth;
   paragraph.classList.add("jump-target");
-}
-
-function hydrateControls() {
-  elements.scriptInput.value = state.script;
-  elements.speedInput.value = state.speed;
-  elements.fontSizeInput.value = state.fontSize;
-  elements.lineHeightInput.value = state.lineHeight;
-  elements.mirrorToggle.checked = state.mirror;
-  elements.guideToggle.checked = state.guide;
-  elements.wakeToggle.checked = state.wake;
-}
-
-function renderScript() {
-  elements.scriptOutput.replaceChildren();
-
-  const script = state.script.trim();
-  if (!script) {
-    const empty = document.createElement("p");
-    empty.className = "empty-line";
-    empty.textContent = "脚本为空";
-    elements.scriptOutput.append(empty);
-    return;
-  }
-
-  script.split(/\n{2,}/).forEach((block) => {
-    const paragraph = document.createElement("p");
-    block.split(/\n/).forEach((line, index) => {
-      if (index > 0) paragraph.append(document.createElement("br"));
-      paragraph.append(document.createTextNode(line));
-    });
-    elements.scriptOutput.append(paragraph);
-  });
-}
-
-function applySettings() {
-  elements.teleprompter.style.setProperty("--script-size", `${state.fontSize}px`);
-  elements.teleprompter.style.setProperty("--script-line", state.lineHeight);
-  elements.teleprompter.style.setProperty("--mirror", state.mirror ? -1 : 1);
-  elements.teleprompter.classList.toggle("hide-guide", !state.guide);
-
-  document.body.classList.toggle("theme-paper", state.theme === "paper");
-  document.body.classList.toggle("theme-studio", state.theme === "studio");
-
-  elements.themeButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.theme === state.theme);
-  });
-
-  elements.speedValue.textContent = state.speed;
-  elements.fontSizeValue.textContent = state.fontSize;
-  elements.lineHeightValue.textContent = Number(state.lineHeight).toFixed(2);
-}
-
-function updateNumberSetting(key, value) {
-  state[key] = Number(value);
-  applySettings();
-  saveState();
-}
-
-function updateBooleanSetting(key, value) {
-  state[key] = value;
-  applySettings();
-  saveState();
-}
-
-async function updateWakeSetting(enabled) {
-  state.wake = enabled;
-  saveState();
-
-  if (!enabled) {
-    await releaseWakeLock();
-    return;
-  }
-
-  const locked = await requestWakeLock();
-  if (!locked) {
-    state.wake = false;
-    elements.wakeToggle.checked = false;
-    saveState();
-  }
-}
-
-function togglePlayback() {
-  if (isPlaying) {
-    pausePlayback();
-    return;
-  }
-  startPlayback();
-}
-
-async function startPlayback() {
-  if (isPlaying) return;
-  isPlaying = true;
-  lastFrameTime = performance.now();
-  elements.playPause.setAttribute("aria-label", "暂停滚动");
-  elements.playIcon.textContent = "Ⅱ";
-  if (state.wake) await requestWakeLock();
-  frameId = requestAnimationFrame(step);
-}
-
-function pausePlayback() {
-  isPlaying = false;
-  elements.playPause.setAttribute("aria-label", "开始滚动");
-  elements.playIcon.textContent = "▶";
-  cancelAnimationFrame(frameId);
-  frameId = null;
-}
-
-function step(now) {
-  if (!isPlaying) return;
-
-  const elapsed = Math.min((now - lastFrameTime) / 1000, 0.08);
-  lastFrameTime = now;
-  elements.teleprompter.scrollTop += state.speed * elapsed;
-
-  if (isAtBottom()) {
-    pausePlayback();
-    updateProgress();
-    return;
-  }
-
-  updateProgress();
-  frameId = requestAnimationFrame(step);
 }
 
 function resetScroll() {
@@ -316,10 +370,33 @@ function jumpBy(amount) {
 }
 
 function updateProgress() {
+  updateActiveParagraph();
+
   const maxScroll = Math.max(1, elements.teleprompter.scrollHeight - elements.teleprompter.clientHeight);
   const progress = Math.min(100, Math.max(0, (elements.teleprompter.scrollTop / maxScroll) * 100));
   elements.progressFill.style.width = `${progress}%`;
   elements.progressLabel.textContent = `${Math.round(progress)}%`;
+
+  if (!isScrubbing) {
+    elements.progressInput.value = String(Math.round((progress / 100) * 1000));
+  }
+
+  const remainingPx = Math.max(0, maxScroll - elements.teleprompter.scrollTop);
+  const remainingSeconds = state.speed > 0 ? remainingPx / state.speed : 0;
+  elements.remainingLabel.textContent = `剩余 ${formatDuration(remainingSeconds)}`;
+}
+
+function handleProgressInput(event) {
+  isScrubbing = true;
+  const maxScroll = Math.max(1, elements.teleprompter.scrollHeight - elements.teleprompter.clientHeight);
+  const target = (Number(event.target.value) / 1000) * maxScroll;
+  elements.teleprompter.scrollTop = target;
+  updateProgress();
+}
+
+function handleProgressCommit() {
+  isScrubbing = false;
+  updateProgress();
 }
 
 function isAtBottom() {
@@ -363,6 +440,7 @@ function handleKeydown(event) {
     toggleFullscreen();
   }
   if (event.key === "Escape") {
+    pausePlayback();
     elements.controlPanel.classList.remove("open");
   }
 }
@@ -371,9 +449,10 @@ function nudgeSpeed(delta) {
   const min = Number(elements.speedInput.min);
   const max = Number(elements.speedInput.max);
   state.speed = Math.min(max, Math.max(min, state.speed + delta));
-  elements.speedInput.value = state.speed;
+  elements.speedInput.value = String(state.speed);
   applySettings();
   saveState();
+  updateProgress();
 }
 
 function importScript(event) {
@@ -430,6 +509,101 @@ async function handleVisibilityChange() {
   if (state.wake) await requestWakeLock();
 }
 
+async function runCountdown() {
+  if (countdownPending || isPlaying || state.countdown <= 0) return;
+
+  countdownPending = true;
+  elements.countdownOverlay.hidden = false;
+  elements.countdownOverlay.textContent = String(state.countdown);
+
+  await new Promise((resolve) => {
+    let current = state.countdown;
+    countdownTimer = window.setInterval(() => {
+      current -= 1;
+      if (current > 0) {
+        elements.countdownOverlay.textContent = String(current);
+        return;
+      }
+
+      window.clearInterval(countdownTimer);
+      countdownTimer = null;
+      elements.countdownOverlay.textContent = "开始";
+      window.setTimeout(resolve, 320);
+    }, 1000);
+  });
+
+  if (!countdownPending) return;
+
+  countdownPending = false;
+  elements.countdownOverlay.hidden = true;
+  await startPlayback();
+}
+
+function clearCountdown() {
+  countdownPending = false;
+  if (countdownTimer) {
+    window.clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+  elements.countdownOverlay.hidden = true;
+}
+
+function updateStats() {
+  const paragraphs = state.script
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const normalizedText = paragraphs.join("").replace(/\s+/g, "");
+  const charCount = normalizedText.length;
+  const paragraphCount = paragraphs.length;
+  const estimatedSeconds = charCount > 0 ? (charCount / 240) * 60 : 0;
+
+  elements.charCountValue.textContent = String(charCount);
+  elements.paragraphCountValue.textContent = String(paragraphCount);
+  elements.durationValue.textContent = formatDuration(estimatedSeconds);
+}
+
+function updateActiveParagraph() {
+  const paragraphs = [...elements.scriptOutput.querySelectorAll("p:not(.empty-line)")];
+  const total = paragraphs.length;
+
+  if (total === 0) {
+    activeParagraphIndex = -1;
+    elements.activeParagraphLabel.textContent = "第 0 / 0 段";
+    return;
+  }
+
+  const guideY = elements.teleprompter.scrollTop + elements.teleprompter.clientHeight * 0.46;
+  let nearestIndex = 0;
+  let smallestDistance = Number.POSITIVE_INFINITY;
+
+  paragraphs.forEach((paragraph, index) => {
+    const paragraphCenter = paragraph.offsetTop + paragraph.offsetHeight / 2;
+    const distance = Math.abs(paragraphCenter - guideY);
+    if (distance < smallestDistance) {
+      smallestDistance = distance;
+      nearestIndex = index;
+    }
+  });
+
+  if (nearestIndex !== activeParagraphIndex) {
+    paragraphs.forEach((paragraph, index) => {
+      paragraph.classList.toggle("active-paragraph", index === nearestIndex);
+      paragraph.classList.toggle("past-paragraph", index < nearestIndex);
+    });
+    activeParagraphIndex = nearestIndex;
+  }
+
+  elements.activeParagraphLabel.textContent = `第 ${nearestIndex + 1} / ${total} 段`;
+}
+
+function formatDuration(seconds) {
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
@@ -443,6 +617,8 @@ function loadState() {
       mirror: Boolean(saved.mirror),
       guide: saved.guide !== false,
       wake: Boolean(saved.wake),
+      focusMode: saved.focusMode !== false,
+      countdown: [0, 3, 5].includes(Number(saved.countdown)) ? Number(saved.countdown) : defaults.countdown,
     };
   } catch {
     return {};
