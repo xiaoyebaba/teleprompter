@@ -71,11 +71,15 @@ const elements = {
   paragraphCountValue: document.querySelector("#paragraphCountValue"),
   durationValue: document.querySelector("#durationValue"),
   ttsStatusValue: document.querySelector("#ttsStatusValue"),
+  ttsParagraphLabel: document.querySelector("#ttsParagraphLabel"),
   speakCurrent: document.querySelector("#speakCurrent"),
   stopSpeaking: document.querySelector("#stopSpeaking"),
+  ttsPrevParagraph: document.querySelector("#ttsPrevParagraph"),
+  ttsNextParagraph: document.querySelector("#ttsNextParagraph"),
   voiceSelect: document.querySelector("#voiceSelect"),
   ttsRateInput: document.querySelector("#ttsRateInput"),
   ttsPreview: document.querySelector("#ttsPreview"),
+  ttsSupportNote: document.querySelector("#ttsSupportNote"),
 };
 
 const state = { ...defaults, ...loadState() };
@@ -94,6 +98,7 @@ let isScrubbing = false;
 let activeParagraphIndex = -1;
 let availableVoices = [];
 let currentUtterance = null;
+let selectedTtsParagraphIndex = -1;
 
 hydrateControls();
 renderScript();
@@ -181,6 +186,8 @@ function bindEvents() {
   elements.downloadScript.addEventListener("click", downloadScript);
   elements.speakCurrent.addEventListener("click", speakActiveParagraph);
   elements.stopSpeaking.addEventListener("click", stopSpeaking);
+  elements.ttsPrevParagraph.addEventListener("click", () => shiftTtsParagraph(-1));
+  elements.ttsNextParagraph.addEventListener("click", () => shiftTtsParagraph(1));
   elements.voiceSelect.addEventListener("change", () => {
     state.voiceURI = elements.voiceSelect.value;
     saveState();
@@ -211,6 +218,7 @@ function hydrateControls() {
 function renderScript() {
   elements.scriptOutput.replaceChildren();
   activeParagraphIndex = -1;
+  selectedTtsParagraphIndex = -1;
 
   const script = state.script.trim();
   if (!script) {
@@ -599,6 +607,7 @@ function updateActiveParagraph() {
   if (total === 0) {
     activeParagraphIndex = -1;
     elements.activeParagraphLabel.textContent = "第 0 / 0 段";
+    elements.ttsParagraphLabel.textContent = "第 0 / 0 段";
     elements.ttsPreview.textContent = "当前没有可朗读的段落";
     return;
   }
@@ -620,12 +629,13 @@ function updateActiveParagraph() {
     paragraphs.forEach((paragraph, index) => {
       paragraph.classList.toggle("active-paragraph", index === nearestIndex);
       paragraph.classList.toggle("past-paragraph", index < nearestIndex);
+      paragraph.classList.toggle("tts-selected", index === getTtsParagraphIndex(total));
     });
     activeParagraphIndex = nearestIndex;
   }
 
   elements.activeParagraphLabel.textContent = `第 ${nearestIndex + 1} / ${total} 段`;
-  elements.ttsPreview.textContent = paragraphs[nearestIndex].textContent?.trim() || "当前没有可朗读的段落";
+  updateTtsSelectionUI(paragraphs);
 }
 
 function formatDuration(seconds) {
@@ -682,6 +692,9 @@ function hydrateVoices() {
     elements.voiceSelect.disabled = true;
     elements.speakCurrent.disabled = true;
     elements.stopSpeaking.disabled = true;
+    elements.ttsPrevParagraph.disabled = true;
+    elements.ttsNextParagraph.disabled = true;
+    elements.ttsSupportNote.hidden = false;
     return;
   }
 
@@ -740,7 +753,7 @@ function getActiveParagraphText() {
   const paragraphs = [...elements.scriptOutput.querySelectorAll("p:not(.empty-line)")];
   if (paragraphs.length === 0) return "";
 
-  const safeIndex = activeParagraphIndex >= 0 ? activeParagraphIndex : 0;
+  const safeIndex = getTtsParagraphIndex(paragraphs.length);
   return paragraphs[safeIndex]?.textContent?.trim() || "";
 }
 
@@ -788,6 +801,42 @@ function stopSpeaking() {
   speechSynthesisApi.cancel();
   currentUtterance = null;
   elements.ttsStatusValue.textContent = "待机";
+}
+
+function shiftTtsParagraph(delta) {
+  const paragraphs = [...elements.scriptOutput.querySelectorAll("p:not(.empty-line)")];
+  if (paragraphs.length === 0) return;
+
+  const currentIndex = getTtsParagraphIndex(paragraphs.length);
+  selectedTtsParagraphIndex = Math.min(paragraphs.length - 1, Math.max(0, currentIndex + delta));
+  updateTtsSelectionUI(paragraphs);
+}
+
+function getTtsParagraphIndex(total) {
+  if (selectedTtsParagraphIndex >= 0 && selectedTtsParagraphIndex < total) {
+    return selectedTtsParagraphIndex;
+  }
+  if (activeParagraphIndex >= 0 && activeParagraphIndex < total) {
+    return activeParagraphIndex;
+  }
+  return 0;
+}
+
+function updateTtsSelectionUI(paragraphs = [...elements.scriptOutput.querySelectorAll("p:not(.empty-line)")]) {
+  const total = paragraphs.length;
+
+  if (total === 0) {
+    elements.ttsParagraphLabel.textContent = "第 0 / 0 段";
+    elements.ttsPreview.textContent = "当前没有可朗读的段落";
+    return;
+  }
+
+  const selectedIndex = getTtsParagraphIndex(total);
+  paragraphs.forEach((paragraph, index) => {
+    paragraph.classList.toggle("tts-selected", index === selectedIndex);
+  });
+  elements.ttsParagraphLabel.textContent = `第 ${selectedIndex + 1} / ${total} 段`;
+  elements.ttsPreview.textContent = paragraphs[selectedIndex]?.textContent?.trim() || "当前没有可朗读的段落";
 }
 
 function getDisplayParagraphs(script) {

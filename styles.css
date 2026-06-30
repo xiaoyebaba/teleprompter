@@ -221,6 +221,22 @@ button {
   text-shadow: 0 0 28px rgba(230, 92, 53, 0.42);
 }
 
+.script-output p.tts-selected {
+  position: relative;
+}
+
+.script-output p.tts-selected::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.28em;
+  width: min(160px, 56%);
+  height: 3px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(23, 163, 152, 0), rgba(23, 163, 152, 0.96), rgba(23, 163, 152, 0));
+}
+
 .script-output p {
   margin: 0 0 1.15em;
   cursor: pointer;
@@ -270,6 +286,76 @@ button {
 
 .countdown-overlay[hidden] {
   display: none;
+}
+
+.tts-float {
+  position: fixed;
+  right: clamp(12px, 2vw, 24px);
+  bottom: clamp(128px, 16vh, 170px);
+  z-index: 30;
+  width: min(360px, calc(100vw - 24px));
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(10, 12, 14, 0.86);
+  color: #fff;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px);
+}
+
+.tts-float-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.tts-float-title {
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.tts-float-body {
+  display: grid;
+  gap: 10px;
+}
+
+.tts-segment-nav {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
+}
+
+.icon-button.small {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+}
+
+.tts-main-button {
+  min-height: 42px;
+}
+
+.tts-float-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tool-button.subtle {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.tts-support-note {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .teleprompter.hide-guide .guide-line {
@@ -599,6 +685,18 @@ input[type="range"]:focus-visible {
   font-size: 0.92rem;
 }
 
+.tts-preview.on-stage {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.9rem;
+}
+
+.tts-panel-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
 .slider-row span,
 .setting-box span,
 .switch-row span {
@@ -741,6 +839,12 @@ input[type="range"] {
   .script-output {
     padding-inline: clamp(18px, 6vw, 54px);
   }
+
+  .tts-float {
+    right: 10px;
+    bottom: 126px;
+    width: min(360px, calc(100vw - 20px));
+  }
 }
 
 @media (max-width: 620px) {
@@ -780,6 +884,14 @@ input[type="range"] {
   .progress-group {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .tts-float {
+    right: 10px;
+    left: 10px;
+    bottom: 122px;
+    width: auto;
+    border-radius: 14px;
   }
 
   .progress-topline {
