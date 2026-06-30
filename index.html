@@ -31,27 +31,45 @@
           <article class="script-output" id="scriptOutput"></article>
         </div>
 
-        <div class="tts-float" id="ttsFloat" aria-label="朗读参考悬浮工具">
-          <div class="tts-float-header">
-            <span class="tts-float-title">朗读参考</span>
-            <output id="ttsStatusValue">待机</output>
-          </div>
-          <div class="tts-float-body">
-            <div class="tts-segment-nav" aria-label="朗读段落选择">
-              <button class="icon-button small" id="ttsPrevParagraph" type="button" aria-label="上一段" title="上一段">
-                <span aria-hidden="true">‹</span>
-              </button>
-              <button class="tool-button tts-main-button" id="speakCurrent" type="button">朗读当前段</button>
-              <button class="icon-button small" id="ttsNextParagraph" type="button" aria-label="下一段" title="下一段">
-                <span aria-hidden="true">›</span>
-              </button>
+        <div class="tts-dock collapsed" id="ttsDock" aria-label="朗读参考悬浮工具">
+          <button class="tts-bubble" id="ttsBubbleToggle" type="button" aria-label="打开朗读参考" title="朗读参考">
+            听
+          </button>
+          <div class="tts-float" id="ttsFloat" hidden>
+            <div class="tts-float-header" id="ttsDragHandle">
+              <span class="tts-float-title">朗读参考</span>
+              <div class="tts-header-actions">
+                <output id="ttsStatusValue">待机</output>
+                <button class="icon-button ghost small" id="ttsCollapse" type="button" aria-label="收起朗读参考" title="收起">
+                  <span aria-hidden="true">×</span>
+                </button>
+              </div>
             </div>
-            <div class="tts-float-meta">
-              <output id="ttsParagraphLabel">第 0 / 0 段</output>
-              <button class="tool-button subtle" id="stopSpeaking" type="button">停止</button>
+            <div class="tts-float-body">
+              <div class="tts-segment-nav" aria-label="朗读段落选择">
+                <button class="icon-button small" id="ttsPrevParagraph" type="button" aria-label="上一段" title="上一段">
+                  <span aria-hidden="true">‹</span>
+                </button>
+                <button class="tool-button tts-main-button" id="speakCurrent" type="button">朗读当前段</button>
+                <button class="icon-button small" id="ttsNextParagraph" type="button" aria-label="下一段" title="下一段">
+                  <span aria-hidden="true">›</span>
+                </button>
+              </div>
+              <div class="tts-float-meta">
+                <output id="ttsParagraphLabel">第 0 / 0 段</output>
+                <button class="tool-button subtle" id="stopSpeaking" type="button">停止</button>
+              </div>
+              <p class="tts-preview on-stage" id="ttsPreview">当前没有可朗读的段落</p>
+              <label class="select-row on-stage">
+                <span>语音</span>
+                <select id="voiceSelect" aria-label="朗读语音"></select>
+              </label>
+              <label class="slider-row on-stage">
+                <span>语速</span>
+                <input id="ttsRateInput" type="range" min="0.7" max="1.4" step="0.05" value="1" />
+              </label>
+              <p class="tts-support-note" id="ttsSupportNote" hidden>当前浏览器可能不支持朗读，建议用系统 Chrome 打开。</p>
             </div>
-            <p class="tts-preview on-stage" id="ttsPreview">当前没有可朗读的段落</p>
-            <p class="tts-support-note" id="ttsSupportNote" hidden>当前浏览器可能不支持朗读，建议用系统 Chrome 打开。</p>
           </div>
         </div>
 
@@ -204,17 +222,9 @@
         <section class="panel-section">
           <div class="section-heading">
             <h2>朗读参考</h2>
-            <span class="value-pill">设置</span>
+            <span class="value-pill">说明</span>
           </div>
-          <label class="select-row">
-            <span>语音</span>
-            <select id="voiceSelect" aria-label="朗读语音"></select>
-          </label>
-          <label class="slider-row">
-            <span>语速</span>
-            <input id="ttsRateInput" type="range" min="0.7" max="1.4" step="0.05" value="1" />
-          </label>
-          <p class="tts-panel-note">朗读按钮已经移到提词区悬浮工具里，全屏时也能直接使用。</p>
+          <p class="tts-panel-note">朗读参考现在会先缩成悬浮球，点开后可切段、换语音、调语速，也支持全屏时直接使用。</p>
         </section>
       </aside>
     </main>

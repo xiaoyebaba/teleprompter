@@ -28,6 +28,9 @@ const defaults = {
   autoSegment: true,
   ttsRate: 1,
   voiceURI: "",
+  ttsExpanded: false,
+  ttsDockX: null,
+  ttsDockY: null,
 };
 
 const elements = {
@@ -72,6 +75,11 @@ const elements = {
   durationValue: document.querySelector("#durationValue"),
   ttsStatusValue: document.querySelector("#ttsStatusValue"),
   ttsParagraphLabel: document.querySelector("#ttsParagraphLabel"),
+  ttsDock: document.querySelector("#ttsDock"),
+  ttsFloat: document.querySelector("#ttsFloat"),
+  ttsBubbleToggle: document.querySelector("#ttsBubbleToggle"),
+  ttsCollapse: document.querySelector("#ttsCollapse"),
+  ttsDragHandle: document.querySelector("#ttsDragHandle"),
   speakCurrent: document.querySelector("#speakCurrent"),
   stopSpeaking: document.querySelector("#stopSpeaking"),
   ttsPrevParagraph: document.querySelector("#ttsPrevParagraph"),
@@ -99,6 +107,7 @@ let activeParagraphIndex = -1;
 let availableVoices = [];
 let currentUtterance = null;
 let selectedTtsParagraphIndex = -1;
+let dockDrag = null;
 
 hydrateControls();
 renderScript();
@@ -106,6 +115,7 @@ applySettings();
 updateProgress();
 bindEvents();
 hydrateVoices();
+applyDockState();
 registerServiceWorker();
 
 function bindEvents() {
@@ -184,6 +194,8 @@ function bindEvents() {
 
   elements.fileInput.addEventListener("change", importScript);
   elements.downloadScript.addEventListener("click", downloadScript);
+  elements.ttsBubbleToggle.addEventListener("click", () => setTtsExpanded(true));
+  elements.ttsCollapse.addEventListener("click", () => setTtsExpanded(false));
   elements.speakCurrent.addEventListener("click", speakActiveParagraph);
   elements.stopSpeaking.addEventListener("click", stopSpeaking);
   elements.ttsPrevParagraph.addEventListener("click", () => shiftTtsParagraph(-1));
@@ -200,6 +212,9 @@ function bindEvents() {
   document.addEventListener("keydown", handleKeydown);
   document.addEventListener("fullscreenchange", () => elements.controlPanel.classList.remove("open"));
   document.addEventListener("visibilitychange", handleVisibilityChange);
+  elements.ttsDragHandle.addEventListener("pointerdown", startDockDrag);
+  window.addEventListener("pointermove", handleDockDrag);
+  window.addEventListener("pointerup", endDockDrag);
 }
 
 function hydrateControls() {
@@ -264,6 +279,31 @@ function applySettings() {
   elements.fontSizeValue.textContent = String(state.fontSize);
   elements.lineHeightValue.textContent = Number(state.lineHeight).toFixed(2);
   elements.countdownValue.textContent = state.countdown === 0 ? "关闭" : `${state.countdown} 秒`;
+}
+
+function applyDockState() {
+  elements.ttsDock.classList.toggle("collapsed", !state.ttsExpanded);
+  elements.ttsDock.classList.toggle("expanded", state.ttsExpanded);
+  elements.ttsFloat.hidden = !state.ttsExpanded;
+  elements.ttsBubbleToggle.hidden = state.ttsExpanded;
+
+  if (Number.isFinite(state.ttsDockX) && Number.isFinite(state.ttsDockY)) {
+    elements.ttsDock.style.left = `${state.ttsDockX}px`;
+    elements.ttsDock.style.top = `${state.ttsDockY}px`;
+    elements.ttsDock.style.right = "auto";
+    elements.ttsDock.style.bottom = "auto";
+  } else {
+    elements.ttsDock.style.left = "";
+    elements.ttsDock.style.top = "";
+    elements.ttsDock.style.right = "";
+    elements.ttsDock.style.bottom = "";
+  }
+}
+
+function setTtsExpanded(expanded) {
+  state.ttsExpanded = expanded;
+  applyDockState();
+  saveState();
 }
 
 function updateNumberSetting(key, value) {
@@ -482,6 +522,9 @@ function handleKeydown(event) {
   if (event.key === "Escape") {
     pausePlayback();
     elements.controlPanel.classList.remove("open");
+    if (state.ttsExpanded) {
+      setTtsExpanded(false);
+    }
   }
 }
 
@@ -661,6 +704,11 @@ function loadState() {
       focusMode: saved.focusMode !== false,
       countdown: [0, 3, 5].includes(Number(saved.countdown)) ? Number(saved.countdown) : defaults.countdown,
       autoSegment: saved.autoSegment !== false,
+      ttsRate: clampNumber(saved.ttsRate, 0.7, 1.4, defaults.ttsRate),
+      voiceURI: typeof saved.voiceURI === "string" ? saved.voiceURI : defaults.voiceURI,
+      ttsExpanded: Boolean(saved.ttsExpanded),
+      ttsDockX: Number.isFinite(Number(saved.ttsDockX)) ? Number(saved.ttsDockX) : defaults.ttsDockX,
+      ttsDockY: Number.isFinite(Number(saved.ttsDockY)) ? Number(saved.ttsDockY) : defaults.ttsDockY,
     };
   } catch {
     return {};
@@ -801,6 +849,33 @@ function stopSpeaking() {
   speechSynthesisApi.cancel();
   currentUtterance = null;
   elements.ttsStatusValue.textContent = "待机";
+}
+
+function startDockDrag(event) {
+  if (!state.ttsExpanded) return;
+  const rect = elements.ttsDock.getBoundingClientRect();
+  dockDrag = {
+    pointerId: event.pointerId,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
+  };
+  elements.ttsDragHandle.setPointerCapture?.(event.pointerId);
+}
+
+function handleDockDrag(event) {
+  if (!dockDrag || event.pointerId !== dockDrag.pointerId) return;
+
+  const maxX = Math.max(8, window.innerWidth - elements.ttsDock.offsetWidth - 8);
+  const maxY = Math.max(8, window.innerHeight - elements.ttsDock.offsetHeight - 8);
+  state.ttsDockX = Math.min(maxX, Math.max(8, event.clientX - dockDrag.offsetX));
+  state.ttsDockY = Math.min(maxY, Math.max(8, event.clientY - dockDrag.offsetY));
+  applyDockState();
+}
+
+function endDockDrag(event) {
+  if (!dockDrag || event.pointerId !== dockDrag.pointerId) return;
+  dockDrag = null;
+  saveState();
 }
 
 function shiftTtsParagraph(delta) {

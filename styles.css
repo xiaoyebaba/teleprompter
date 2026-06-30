@@ -288,11 +288,27 @@ button {
   display: none;
 }
 
-.tts-float {
+.tts-dock {
   position: fixed;
   right: clamp(12px, 2vw, 24px);
   bottom: clamp(128px, 16vh, 170px);
   z-index: 30;
+}
+
+.tts-bubble {
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(10, 12, 14, 0.86);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px);
+}
+
+.tts-float {
   width: min(360px, calc(100vw - 24px));
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -303,17 +319,33 @@ button {
   backdrop-filter: blur(18px);
 }
 
+.tts-dock.collapsed .tts-float {
+  display: none;
+}
+
+.tts-dock.expanded .tts-bubble {
+  display: none;
+}
+
 .tts-float-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
+  cursor: move;
+  touch-action: none;
 }
 
 .tts-float-title {
   font-size: 0.88rem;
   color: rgba(255, 255, 255, 0.68);
+}
+
+.tts-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tts-float-body {
@@ -663,6 +695,11 @@ input[type="range"]:focus-visible {
   margin-bottom: 12px;
 }
 
+.select-row.on-stage,
+.slider-row.on-stage {
+  margin-bottom: 0;
+}
+
 .select-row span {
   color: var(--muted);
   font-size: 0.88rem;
@@ -841,8 +878,6 @@ input[type="range"] {
   }
 
   .tts-float {
-    right: 10px;
-    bottom: 126px;
     width: min(360px, calc(100vw - 20px));
   }
 }
@@ -886,11 +921,13 @@ input[type="range"] {
     width: 100%;
   }
 
+  .tts-bubble {
+    width: 54px;
+    height: 54px;
+  }
+
   .tts-float {
-    right: 10px;
-    left: 10px;
-    bottom: 122px;
-    width: auto;
+    width: min(340px, calc(100vw - 20px));
     border-radius: 14px;
   }
 
