@@ -267,6 +267,10 @@ button {
   backdrop-filter: blur(12px);
 }
 
+.countdown-overlay[hidden] {
+  display: none;
+}
+
 .teleprompter.hide-guide .guide-line {
   display: none;
 }
