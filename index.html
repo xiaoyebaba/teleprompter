@@ -176,6 +176,31 @@
             </div>
           </div>
         </section>
+
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>朗读参考</h2>
+            <span class="value-pill"><output id="ttsStatusValue">待机</output></span>
+          </div>
+          <div class="button-row tts-actions">
+            <button class="tool-button" id="speakCurrent" type="button">朗读当前段</button>
+            <button class="tool-button" id="stopSpeaking" type="button">停止</button>
+          </div>
+          <label class="select-row">
+            <span>语音</span>
+            <select id="voiceSelect" aria-label="朗读语音"></select>
+          </label>
+          <label class="slider-row">
+            <span>语速</span>
+            <input id="ttsRateInput" type="range" min="0.7" max="1.4" step="0.05" value="1" />
+          </label>
+          <div class="subsection">
+            <div class="subsection-heading">
+              <span>当前朗读内容</span>
+            </div>
+            <p class="tts-preview" id="ttsPreview">当前没有可朗读的段落</p>
+          </div>
+        </section>
       </aside>
     </main>
 

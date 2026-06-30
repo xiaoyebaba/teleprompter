@@ -32,7 +32,8 @@ body {
 
 button,
 textarea,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -558,6 +559,44 @@ input[type="range"]:focus-visible {
 .subsection-heading span {
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+.tts-actions {
+  margin-bottom: 12px;
+}
+
+.tts-actions .tool-button {
+  flex: 1;
+}
+
+.select-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.select-row span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.select-row select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.tts-preview {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.6;
+  font-size: 0.92rem;
 }
 
 .slider-row span,

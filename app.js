@@ -26,6 +26,8 @@ const defaults = {
   focusMode: true,
   countdown: 0,
   autoSegment: true,
+  ttsRate: 1,
+  voiceURI: "",
 };
 
 const elements = {
@@ -68,9 +70,16 @@ const elements = {
   charCountValue: document.querySelector("#charCountValue"),
   paragraphCountValue: document.querySelector("#paragraphCountValue"),
   durationValue: document.querySelector("#durationValue"),
+  ttsStatusValue: document.querySelector("#ttsStatusValue"),
+  speakCurrent: document.querySelector("#speakCurrent"),
+  stopSpeaking: document.querySelector("#stopSpeaking"),
+  voiceSelect: document.querySelector("#voiceSelect"),
+  ttsRateInput: document.querySelector("#ttsRateInput"),
+  ttsPreview: document.querySelector("#ttsPreview"),
 };
 
 const state = { ...defaults, ...loadState() };
+const speechSynthesisApi = window.speechSynthesis;
 
 let isPlaying = false;
 let frameId = null;
@@ -83,12 +92,15 @@ let countdownTimer = null;
 let countdownPending = false;
 let isScrubbing = false;
 let activeParagraphIndex = -1;
+let availableVoices = [];
+let currentUtterance = null;
 
 hydrateControls();
 renderScript();
 applySettings();
 updateProgress();
 bindEvents();
+hydrateVoices();
 registerServiceWorker();
 
 function bindEvents() {
@@ -167,6 +179,16 @@ function bindEvents() {
 
   elements.fileInput.addEventListener("change", importScript);
   elements.downloadScript.addEventListener("click", downloadScript);
+  elements.speakCurrent.addEventListener("click", speakActiveParagraph);
+  elements.stopSpeaking.addEventListener("click", stopSpeaking);
+  elements.voiceSelect.addEventListener("change", () => {
+    state.voiceURI = elements.voiceSelect.value;
+    saveState();
+  });
+  elements.ttsRateInput.addEventListener("input", () => {
+    state.ttsRate = Number(elements.ttsRateInput.value);
+    saveState();
+  });
 
   document.addEventListener("keydown", handleKeydown);
   document.addEventListener("fullscreenchange", () => elements.controlPanel.classList.remove("open"));
@@ -183,6 +205,7 @@ function hydrateControls() {
   elements.focusToggle.checked = state.focusMode;
   elements.wakeToggle.checked = state.wake;
   elements.autoSegmentToggle.checked = state.autoSegment;
+  elements.ttsRateInput.value = String(state.ttsRate);
 }
 
 function renderScript() {
@@ -576,6 +599,7 @@ function updateActiveParagraph() {
   if (total === 0) {
     activeParagraphIndex = -1;
     elements.activeParagraphLabel.textContent = "第 0 / 0 段";
+    elements.ttsPreview.textContent = "当前没有可朗读的段落";
     return;
   }
 
@@ -601,6 +625,7 @@ function updateActiveParagraph() {
   }
 
   elements.activeParagraphLabel.textContent = `第 ${nearestIndex + 1} / ${total} 段`;
+  elements.ttsPreview.textContent = paragraphs[nearestIndex].textContent?.trim() || "当前没有可朗读的段落";
 }
 
 function formatDuration(seconds) {
@@ -649,6 +674,120 @@ async function registerServiceWorker() {
   } catch {
     // Service workers require HTTPS or localhost.
   }
+}
+
+function hydrateVoices() {
+  if (!speechSynthesisApi) {
+    elements.ttsStatusValue.textContent = "不可用";
+    elements.voiceSelect.disabled = true;
+    elements.speakCurrent.disabled = true;
+    elements.stopSpeaking.disabled = true;
+    return;
+  }
+
+  loadVoices();
+  speechSynthesisApi.addEventListener("voiceschanged", loadVoices);
+}
+
+function loadVoices() {
+  if (!speechSynthesisApi) return;
+
+  availableVoices = speechSynthesisApi.getVoices();
+  elements.voiceSelect.replaceChildren();
+
+  if (availableVoices.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "系统语音加载中";
+    elements.voiceSelect.append(option);
+    elements.voiceSelect.disabled = true;
+    return;
+  }
+
+  const preferredVoices = [...availableVoices].sort((left, right) => {
+    const leftScore = scoreVoice(left);
+    const rightScore = scoreVoice(right);
+    return rightScore - leftScore;
+  });
+
+  preferredVoices.forEach((voice) => {
+    const option = document.createElement("option");
+    option.value = voice.voiceURI;
+    option.textContent = `${voice.name} · ${voice.lang}${voice.default ? " · 默认" : ""}`;
+    elements.voiceSelect.append(option);
+  });
+
+  elements.voiceSelect.disabled = false;
+  const preferred = preferredVoices.find((voice) => voice.voiceURI === state.voiceURI) || preferredVoices[0];
+  state.voiceURI = preferred?.voiceURI || "";
+  elements.voiceSelect.value = state.voiceURI;
+  saveState();
+}
+
+function scoreVoice(voice) {
+  const lang = String(voice.lang || "").toLowerCase();
+  let score = 0;
+
+  if (lang.startsWith("zh")) score += 4;
+  if (lang.startsWith("en")) score += 3;
+  if (voice.default) score += 2;
+  if (/natural|neural|premium/i.test(voice.name)) score += 1;
+
+  return score;
+}
+
+function getActiveParagraphText() {
+  const paragraphs = [...elements.scriptOutput.querySelectorAll("p:not(.empty-line)")];
+  if (paragraphs.length === 0) return "";
+
+  const safeIndex = activeParagraphIndex >= 0 ? activeParagraphIndex : 0;
+  return paragraphs[safeIndex]?.textContent?.trim() || "";
+}
+
+function speakActiveParagraph() {
+  if (!speechSynthesisApi) {
+    elements.ttsStatusValue.textContent = "不可用";
+    return;
+  }
+
+  const text = getActiveParagraphText();
+  if (!text) {
+    elements.ttsStatusValue.textContent = "无内容";
+    return;
+  }
+
+  stopSpeaking();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  const selectedVoice = availableVoices.find((voice) => voice.voiceURI === state.voiceURI);
+
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+    utterance.lang = selectedVoice.lang;
+  }
+
+  utterance.rate = Number(state.ttsRate) || 1;
+  utterance.onstart = () => {
+    elements.ttsStatusValue.textContent = "朗读中";
+  };
+  utterance.onend = () => {
+    currentUtterance = null;
+    elements.ttsStatusValue.textContent = "待机";
+  };
+  utterance.onerror = () => {
+    currentUtterance = null;
+    elements.ttsStatusValue.textContent = "失败";
+  };
+
+  currentUtterance = utterance;
+  speechSynthesisApi.speak(utterance);
+}
+
+function stopSpeaking() {
+  if (!speechSynthesisApi) return;
+  speechSynthesisApi.cancel();
+  currentUtterance = null;
+  elements.ttsStatusValue.textContent = "待机";
 }
 
 function getDisplayParagraphs(script) {
