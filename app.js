@@ -25,6 +25,7 @@ const defaults = {
   wake: false,
   focusMode: true,
   countdown: 0,
+  autoSegment: true,
 };
 
 const elements = {
@@ -54,6 +55,7 @@ const elements = {
   guideToggle: document.querySelector("#guideToggle"),
   wakeToggle: document.querySelector("#wakeToggle"),
   focusToggle: document.querySelector("#focusToggle"),
+  autoSegmentToggle: document.querySelector("#autoSegmentToggle"),
   loadSample: document.querySelector("#loadSample"),
   clearScript: document.querySelector("#clearScript"),
   fileInput: document.querySelector("#fileInput"),
@@ -124,6 +126,12 @@ function bindEvents() {
   elements.guideToggle.addEventListener("change", () => updateBooleanSetting("guide", elements.guideToggle.checked));
   elements.focusToggle.addEventListener("change", () => updateBooleanSetting("focusMode", elements.focusToggle.checked));
   elements.wakeToggle.addEventListener("change", () => updateWakeSetting(elements.wakeToggle.checked));
+  elements.autoSegmentToggle.addEventListener("change", () => {
+    state.autoSegment = elements.autoSegmentToggle.checked;
+    renderScript();
+    saveState();
+    updateProgress();
+  });
 
   elements.themeButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -174,6 +182,7 @@ function hydrateControls() {
   elements.guideToggle.checked = state.guide;
   elements.focusToggle.checked = state.focusMode;
   elements.wakeToggle.checked = state.wake;
+  elements.autoSegmentToggle.checked = state.autoSegment;
 }
 
 function renderScript() {
@@ -190,7 +199,7 @@ function renderScript() {
     return;
   }
 
-  script.split(/\n{2,}/).forEach((block) => {
+  getDisplayParagraphs(state.script).forEach((block) => {
     const paragraph = document.createElement("p");
     block.split(/\n/).forEach((line, index) => {
       if (index > 0) paragraph.append(document.createElement("br"));
@@ -549,10 +558,7 @@ function clearCountdown() {
 }
 
 function updateStats() {
-  const paragraphs = state.script
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
+  const paragraphs = getDisplayParagraphs(state.script);
   const normalizedText = paragraphs.join("").replace(/\s+/g, "");
   const charCount = normalizedText.length;
   const paragraphCount = paragraphs.length;
@@ -619,6 +625,7 @@ function loadState() {
       wake: Boolean(saved.wake),
       focusMode: saved.focusMode !== false,
       countdown: [0, 3, 5].includes(Number(saved.countdown)) ? Number(saved.countdown) : defaults.countdown,
+      autoSegment: saved.autoSegment !== false,
     };
   } catch {
     return {};
@@ -642,4 +649,85 @@ async function registerServiceWorker() {
   } catch {
     // Service workers require HTTPS or localhost.
   }
+}
+
+function getDisplayParagraphs(script) {
+  const normalized = String(script || "").replace(/\r\n/g, "\n").trim();
+  if (!normalized) return [];
+
+  const baseBlocks = normalized
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (!state.autoSegment) {
+    return baseBlocks;
+  }
+
+  return baseBlocks.flatMap((block) => splitIntoSentenceParagraphs(block));
+}
+
+function splitIntoSentenceParagraphs(block) {
+  const lines = block
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return [];
+
+  const merged = lines.join(" ");
+  const sentences = [];
+  let buffer = "";
+
+  for (let index = 0; index < merged.length; index += 1) {
+    const char = merged[index];
+    const prevChar = merged[index - 1] || "";
+    const nextChar = merged[index + 1] || "";
+
+    buffer += char;
+
+    if (!isSentenceBoundary(char, prevChar, nextChar, buffer)) {
+      continue;
+    }
+
+    const sentence = buffer.trim();
+    if (sentence) {
+      sentences.push(sentence);
+    }
+    buffer = "";
+  }
+
+  const tail = buffer.trim();
+  if (tail) {
+    sentences.push(tail);
+  }
+
+  return sentences.length > 0 ? sentences : [merged];
+}
+
+function isSentenceBoundary(char, prevChar, nextChar, buffer) {
+  if ("。！？；".includes(char)) {
+    return true;
+  }
+
+  if (char === "…" && nextChar !== "…") {
+    return true;
+  }
+
+  if (!".?!;".includes(char)) {
+    return false;
+  }
+
+  if (char === "." && /\d/.test(prevChar) && /\d/.test(nextChar)) {
+    return false;
+  }
+
+  if (char === ".") {
+    const abbreviationMatch = buffer.match(/(?:\b[A-Za-z]\.){1,}$/);
+    if (abbreviationMatch && /[A-Za-z]/.test(nextChar)) {
+      return false;
+    }
+  }
+
+  return true;
 }

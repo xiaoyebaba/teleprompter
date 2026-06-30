@@ -518,6 +518,12 @@ input[type="range"]:focus-visible {
   margin-top: 10px;
 }
 
+.editor-switch {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
 .value-pill {
   min-width: 82px;
   padding: 6px 10px;
